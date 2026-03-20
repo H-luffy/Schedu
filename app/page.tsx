@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { UploadZone } from "@/components/UploadZone";
 import { ImageUploadZone } from "@/components/ImageUploadZone";
 import { ScheduleGrid } from "@/components/ScheduleGrid";
@@ -9,7 +10,7 @@ import type { Course, ParseResult, ScheduleTemplate } from "@/lib/types";
 import { exportCoursesToWorkbook } from "@/lib/excel-parser";
 import { getDefaultTemplate } from "@/lib/templates";
 import * as XLSX from "xlsx";
-import { Download, Trash2, AlertTriangle, ImageDown } from "lucide-react";
+import { Download, Trash2, AlertTriangle, ImageDown, Palette } from "lucide-react";
 
 const STORAGE_KEY = "schedule-courses-v1";
 
@@ -31,8 +32,14 @@ export default function HomePage() {
         setCourses(parsed);
       }
       
+      // 优先加载自定义模板
+      const customTemplateRaw = window.localStorage.getItem("custom-template");
       const templateRaw = window.localStorage.getItem(TEMPLATE_STORAGE_KEY);
-      if (templateRaw) {
+
+      if (customTemplateRaw) {
+        const parsed = JSON.parse(customTemplateRaw);
+        setSelectedTemplate(parsed);
+      } else if (templateRaw) {
         const parsed = JSON.parse(templateRaw);
         setSelectedTemplate(parsed);
       } else {
@@ -153,6 +160,13 @@ export default function HomePage() {
             selectedTemplate={selectedTemplate}
             onTemplateChange={setSelectedTemplate}
           />
+          <Link
+            href="/templates"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+          >
+            <Palette className="h-3.5 w-3.5" />
+            查看更多模板
+          </Link>
           <button
             type="button"
             onClick={handleExport}

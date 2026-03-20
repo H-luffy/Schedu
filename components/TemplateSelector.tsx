@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Palette } from "lucide-react";
 import { SCHEDULE_TEMPLATES, getTemplateById, getDefaultTemplate } from "@/lib/templates";
 import type { ScheduleTemplate } from "@/lib/types";
+import { TemplatePreview } from "@/components/TemplatePreview";
 
 interface TemplateSelectorProps {
   selectedTemplate?: ScheduleTemplate;
@@ -54,13 +55,12 @@ export function TemplateSelector({ selectedTemplate, onTemplateChange }: Templat
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div
-                        className="h-10 w-10 shrink-0 rounded-lg"
-                        style={{ backgroundColor: template.previewColor }}
-                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900">{template.name}</p>
                         <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">{template.description}</p>
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <TemplatePreview template={template} />
                       </div>
                     </div>
                   </button>
