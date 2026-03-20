@@ -38,5 +38,40 @@ export interface ParseResult {
 export interface ScheduleGridProps {
   courses: Course[];
   maxSlot?: number;
+  template?: ScheduleTemplate;
+}
+
+export type TemplateStyle = "minimal" | "colorful" | "professional" | "creative" | "dark";
+
+export interface ScheduleTemplate {
+  id: string;
+  name: string;
+  style: TemplateStyle;
+  description: string;
+  previewColor: string;
+  colors: {
+    background: string;
+    headerBg: string;
+    headerText: string;
+    gridLines: string;
+    cellBg: string;
+    cellText: string;
+    courseDefault: string;
+    courseText: string;
+    conflictBg: string;
+    conflictText: string;
+  };
+  fonts?: {
+    header?: string;
+    body?: string;
+  };
+  borderRadius?: {
+    cell?: string;
+    course?: string;
+  };
+  spacing?: {
+    cellPadding?: string;
+    gap?: string;
+  };
 }
 

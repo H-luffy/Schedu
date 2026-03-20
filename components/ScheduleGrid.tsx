@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { forwardRef, useMemo } from "react";
 import type React from "react";
 import type { ScheduleGridProps, Weekday } from "@/lib/types";
 import { twMerge } from "tailwind-merge";
@@ -20,7 +20,8 @@ function getMaxSlotFromCourses(courses: ScheduleGridProps["courses"]): number {
   return courses.reduce((max, c) => Math.max(max, c.endSlot), 10);
 }
 
-export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
+export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(
+  ({ courses, maxSlot, template }, ref) => {
   const resolvedMaxSlot = useMemo(
     () => maxSlot ?? getMaxSlotFromCourses(courses),
     [courses, maxSlot]
@@ -28,8 +29,32 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
   const rows = Array.from({ length: resolvedMaxSlot }, (_, i) => i + 1);
   const days: Weekday[] = [1, 2, 3, 4, 5, 6, 7];
 
+  // 使用模板样式或默认样式
+  const templateStyle = template?.colors || {
+    background: "#ffffff",
+    headerBg: "#f8fafc",
+    headerText: "#1e293b",
+    gridLines: "#e2e8f0",
+    cellBg: "#ffffff",
+    cellText: "#64748b",
+    courseDefault: "#dbeafe",
+    courseText: "#1e3a8a",
+    conflictBg: "#fee2e2",
+    conflictText: "#991b1b"
+  };
+
+  const borderRadius = template?.borderRadius || {
+    cell: "0",
+    course: "4px"
+  };
+
+  const spacing = template?.spacing || {
+    cellPadding: "8px",
+    gap: "4px"
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={ref}>
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <div
           className="grid min-w-[720px]"
@@ -37,18 +62,34 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
             // 第一列：节次；其余 7 列：周一到周日
             gridTemplateColumns: "auto repeat(7, minmax(0, 1fr))",
             // 第一行：表头；其余行为第 1~N 节
-            gridTemplateRows: `40px repeat(${resolvedMaxSlot}, 64px)`
+            gridTemplateRows: `40px repeat(${resolvedMaxSlot}, 64px)`,
+            backgroundColor: templateStyle.background,
+            gap: spacing.gap
           }}
         >
           {/* 左上角表头 */}
-          <div className="sticky top-0 z-10 flex items-center justify-center border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500">
+          <div 
+            className="sticky top-0 z-10 flex items-center justify-center border-b text-xs font-medium"
+            style={{
+              backgroundColor: templateStyle.headerBg,
+              color: templateStyle.headerText,
+              borderColor: templateStyle.gridLines,
+              borderRadius: borderRadius.cell
+            }}
+          >
             节次
           </div>
           {/* 表头：周几（列头） */}
           {days.map((day) => (
             <div
               key={`col-header-${day}`}
-              className="sticky top-0 z-10 flex items-center justify-center border-b border-l border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
+              className="sticky top-0 z-10 flex items-center justify-center border-b border-l text-xs font-medium"
+              style={{
+                backgroundColor: templateStyle.headerBg,
+                color: templateStyle.headerText,
+                borderColor: templateStyle.gridLines,
+                borderRadius: borderRadius.cell
+              }}
             >
               {WEEKDAY_LABELS[day]}
             </div>
@@ -57,8 +98,12 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
           {rows.map((slot) => (
             <div
               key={`row-label-${slot}`}
-              className="flex items-center justify-center border-b border-slate-200 bg-slate-50 text-[11px] font-medium text-slate-600"
+              className="flex items-center justify-center border-b text-[11px] font-medium"
               style={{
+                backgroundColor: templateStyle.cellBg,
+                color: templateStyle.cellText,
+                borderColor: templateStyle.gridLines,
+                borderRadius: borderRadius.cell,
                 gridColumnStart: 1,
                 gridColumnEnd: 2,
                 gridRowStart: slot + 1,
@@ -73,8 +118,10 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
             days.map((day) => (
               <div
                 key={`cell-bg-${day}-${slot}`}
-                className="relative border-b border-l border-slate-100"
+                className="relative border-b border-l"
                 style={{
+                  backgroundColor: templateStyle.cellBg,
+                  borderColor: templateStyle.gridLines,
                   gridColumnStart: day + 1,
                   gridColumnEnd: day + 2,
                   gridRowStart: slot + 1,
@@ -90,48 +137,46 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
             const rowEnd = course.endSlot + 2;
             const colStart = course.day + 1; // +1 因为第 1 列是节次
             const colEnd = course.day + 2;
-            const bg = course.color || "#dbeafe";
+            const bg = course.color || templateStyle.courseDefault;
+            const isConflict = course.isConflict;
             return (
               <div
                 key={course.id}
-                className={twMerge(
-                  "relative m-0.5 flex min-h-0 flex-col overflow-hidden rounded-lg border text-xs shadow-sm",
-                  clsx(
-                    "border-transparent text-slate-900",
-                    course.isConflict
-                      ? "border-red-500 bg-red-50"
-                      : "bg-[color:var(--course-color)]"
-                  )
-                )}
-                style={
-                  {
-                    gridRowStart: rowStart,
-                    gridRowEnd: rowEnd,
-                    gridColumnStart: colStart,
-                    gridColumnEnd: colEnd,
-                    "--course-color": bg
-                  } as React.CSSProperties
-                }
+                className="relative m-0.5 flex min-h-0 flex-col overflow-hidden border text-xs shadow-sm"
+                style={{
+                  gridRowStart: rowStart,
+                  gridRowEnd: rowEnd,
+                  gridColumnStart: colStart,
+                  gridColumnEnd: colEnd,
+                  backgroundColor: isConflict ? templateStyle.conflictBg : bg,
+                  color: isConflict ? templateStyle.conflictText : templateStyle.courseText,
+                  borderColor: isConflict ? templateStyle.conflictText : "transparent",
+                  borderRadius: borderRadius.course,
+                  padding: spacing.cellPadding
+                }}
               >
-                <div className="flex-1 px-2.5 py-2">
+                <div className="flex-1">
                   <p className="truncate text-xs font-semibold">
                     {course.name}
                   </p>
                   {course.classroom && (
-                    <p className="mt-0.5 truncate text-[11px] text-slate-700">
+                    <p className="mt-0.5 truncate text-[11px]">
                       {course.classroom}
                     </p>
                   )}
                   {course.teacher && (
-                    <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                    <p className="mt-0.5 truncate text-[11px]">
                       {course.teacher}
                     </p>
                   )}
                 </div>
-                <div className="border-t border-white/40 bg-black/5 px-2 py-0.5 text-[10px] text-slate-700">
+                <div className="mt-1 border-t px-1 py-0.5 text-[10px] opacity-70">
                   第 {course.startSlot}-{course.endSlot} 节
-                  {course.isConflict && (
-                    <span className="ml-1 rounded-full bg-red-500/90 px-1 text-[9px] font-semibold text-white">
+                  {isConflict && (
+                    <span className="ml-1 rounded-full px-1 text-[9px] font-semibold" style={{
+                      backgroundColor: templateStyle.conflictText,
+                      color: templateStyle.conflictBg
+                    }}>
                       冲突
                     </span>
                   )}
@@ -149,13 +194,17 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
           return (
             <div
               key={`mobile-day-${day}`}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm"
+              className="rounded-xl border px-3 py-2 shadow-sm"
+              style={{
+                backgroundColor: templateStyle.background,
+                borderColor: templateStyle.gridLines
+              }}
             >
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-800">
+                <p className="text-xs font-semibold" style={{ color: templateStyle.headerText }}>
                   {WEEKDAY_LABELS[day]}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px]" style={{ color: templateStyle.cellText }}>
                   {dayCourses.length > 0
                     ? `${dayCourses.length} 门课程`
                     : "无课程"}
@@ -165,24 +214,28 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
                 {dayCourses.map((course) => (
                   <div
                     key={course.id}
-                    className={twMerge(
-                      "flex flex-col rounded-lg border px-2.5 py-1.5 text-xs",
-                      course.isConflict
-                        ? "border-red-400 bg-red-50"
-                        : "border-slate-200 bg-slate-50"
-                    )}
+                    className="flex flex-col rounded-lg border px-2.5 py-1.5 text-xs"
+                    style={{
+                      backgroundColor: course.isConflict ? templateStyle.conflictBg : (course.color || templateStyle.courseDefault),
+                      borderColor: course.isConflict ? templateStyle.conflictText : templateStyle.gridLines,
+                      color: course.isConflict ? templateStyle.conflictText : templateStyle.courseText,
+                      borderRadius: borderRadius.course
+                    }}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate font-semibold">{course.name}</p>
-                      <span className="shrink-0 text-[11px] text-slate-600">
+                      <span className="shrink-0 text-[11px]">
                         第 {course.startSlot}-{course.endSlot} 节
                       </span>
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
                       {course.classroom && <span>{course.classroom}</span>}
                       {course.teacher && <span>{course.teacher}</span>}
                       {course.isConflict && (
-                        <span className="rounded-full bg-red-500/90 px-1 text-[10px] font-semibold text-white">
+                        <span className="rounded-full px-1 text-[10px] font-semibold" style={{
+                          backgroundColor: templateStyle.conflictText,
+                          color: templateStyle.conflictBg
+                        }}>
                           冲突
                         </span>
                       )}
@@ -190,7 +243,7 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
                   </div>
                 ))}
                 {dayCourses.length === 0 && (
-                  <p className="py-1 text-[11px] text-slate-400">暂无课程</p>
+                  <p className="py-1 text-[11px]" style={{ color: templateStyle.cellText }}>暂无课程</p>
                 )}
               </div>
             </div>
@@ -199,5 +252,7 @@ export function ScheduleGrid({ courses, maxSlot }: ScheduleGridProps) {
       </div>
     </div>
   );
-}
+});
+
+ScheduleGrid.displayName = "ScheduleGrid";
 
