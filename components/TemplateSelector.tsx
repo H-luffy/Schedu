@@ -9,11 +9,13 @@ import { TemplatePreview } from "@/components/TemplatePreview";
 interface TemplateSelectorProps {
   selectedTemplate?: ScheduleTemplate;
   onTemplateChange: (template: ScheduleTemplate) => void;
+  allTemplates?: ScheduleTemplate[];
 }
 
-export function TemplateSelector({ selectedTemplate, onTemplateChange }: TemplateSelectorProps) {
+export function TemplateSelector({ selectedTemplate, onTemplateChange, allTemplates }: TemplateSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const currentTemplate = selectedTemplate || getDefaultTemplate();
+  const templates = allTemplates || SCHEDULE_TEMPLATES;
 
   return (
     <div className="relative">
@@ -40,7 +42,7 @@ export function TemplateSelector({ selectedTemplate, onTemplateChange }: Templat
             <div className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-slate-900">选择课表模板</h3>
               <div className="space-y-2">
-                {SCHEDULE_TEMPLATES.map((template) => (
+                {templates.map((template) => (
                   <button
                     key={template.id}
                     type="button"

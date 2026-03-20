@@ -8,7 +8,8 @@ import { ScheduleGrid } from "@/components/ScheduleGrid";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import type { Course, ParseResult, ScheduleTemplate } from "@/lib/types";
 import { exportCoursesToWorkbook } from "@/lib/excel-parser";
-import { getDefaultTemplate } from "@/lib/templates";
+import { getDefaultTemplate, SCHEDULE_TEMPLATES } from "@/lib/templates";
+import { getAllTemplates } from "@/lib/excelTemplateLoader";
 import * as XLSX from "xlsx";
 import { Download, Trash2, AlertTriangle, ImageDown, Palette } from "lucide-react";
 
@@ -22,6 +23,7 @@ export default function HomePage() {
   const [hasHydrated, setHasHydrated] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ScheduleTemplate | null>(null);
+  const [allTemplates, setAllTemplates] = useState<ScheduleTemplate[]>(SCHEDULE_TEMPLATES);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -32,14 +34,22 @@ export default function HomePage() {
         setCourses(parsed);
       }
       
-      // 优先加载自定义模板
-      const customTemplateRaw = window.localStorage.getItem("custom-template");
+      // 加载系统预设模板和Excel模板
+      const loadTemplates = async () => {
+        try {
+          const templates = await getAllTemplates(SCHEDULE_TEMPLATES);
+          setAllTemplates(templates);
+        } catch (error) {
+          console.error("加载模板失败:", error);
+        }
+      };
+
+      loadTemplates();
+
+      // 加载用户选择的模板
       const templateRaw = window.localStorage.getItem(TEMPLATE_STORAGE_KEY);
 
-      if (customTemplateRaw) {
-        const parsed = JSON.parse(customTemplateRaw);
-        setSelectedTemplate(parsed);
-      } else if (templateRaw) {
+      if (templateRaw) {
         const parsed = JSON.parse(templateRaw);
         setSelectedTemplate(parsed);
       } else {
@@ -159,6 +169,7 @@ export default function HomePage() {
           <TemplateSelector
             selectedTemplate={selectedTemplate}
             onTemplateChange={setSelectedTemplate}
+            allTemplates={allTemplates}
           />
           <Link
             href="/templates"

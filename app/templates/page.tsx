@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Check, Palette, Download, Heart, Upload } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Check, Palette, Heart, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { SCHEDULE_TEMPLATES, getDefaultTemplate } from "@/lib/templates";
+import { getAllTemplates } from "@/lib/excelTemplateLoader";
 import type { ScheduleTemplate } from "@/lib/types";
 
 export default function TemplatesPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<ScheduleTemplate>(getDefaultTemplate());
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [allTemplates, setAllTemplates] = useState<ScheduleTemplate[]>(SCHEDULE_TEMPLATES);
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleFavorite = (e: React.MouseEvent, templateId: string) => {
     e.stopPropagation();
@@ -21,40 +24,22 @@ export default function TemplatesPage() {
     setFavorites(newFavorites);
   };
 
-  const downloadTemplate = (template: ScheduleTemplate) => {
-    const dataStr = JSON.stringify(template, null, 2);
-    const dataUri = "data:application/json;charset=utf-8,"+ encodeURIComponent(dataStr);
-
-    const exportFileDefaultName = `schedule-template-${template.id}.json`;
-
-    const linkElement = document.createElement("a");
-    linkElement.setAttribute("href", dataUri);
-    linkElement.setAttribute("download", exportFileDefaultName);
-    linkElement.click();
-  };
-
-  const handleImportTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
+  // 加载Excel模板
+  useEffect(() => {
+    const loadExcelTemplates = async () => {
+      setIsLoading(true);
       try {
-        const template = JSON.parse(event.target?.result as string) as ScheduleTemplate;
-        if (template.id && template.name && template.colors) {
-          setSelectedTemplate(template);
-          // 存储到 localStorage
-          localStorage.setItem("custom-template", JSON.stringify(template));
-          alert("模板导入成功！");
-        } else {
-          alert("无效的模板格式");
-        }
+        const templates = await getAllTemplates(SCHEDULE_TEMPLATES);
+        setAllTemplates(templates);
       } catch (error) {
-        alert("解析模板文件失败");
+        console.error("加载Excel模板失败:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    reader.readAsText(file);
-  };
+
+    loadExcelTemplates();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -77,32 +62,19 @@ export default function TemplatesPage() {
           <div className="flex items-center gap-2">
             <Palette className="h-5 w-5 text-slate-600" />
             <h2 className="text-xl font-semibold text-slate-900">所有模板</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/editor"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600"
-            >
-              <Upload className="h-4 w-4" />
-              创建自定义模板
-            </Link>
-            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer">
-              <Upload className="h-4 w-4" />
-              导入模板
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportTemplate}
-                className="hidden"
-              />
-            </label>
+            {isLoading && (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                加载Excel模板中...
+              </div>
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {SCHEDULE_TEMPLATES.map((template) => (
+              {allTemplates.map((template) => (
                 <div
                   key={template.id}
                   onClick={() => setSelectedTemplate(template)}
@@ -135,16 +107,6 @@ export default function TemplatesPage() {
                       )}
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadTemplate(template);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        下载模板
-                      </button>
                       <button
                         onClick={(e) => toggleFavorite(e, template.id)}
                         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
