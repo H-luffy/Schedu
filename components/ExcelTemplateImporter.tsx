@@ -77,12 +77,14 @@ export default function ExcelTemplateImporter({ onTemplatesImported }: ExcelTemp
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h4 className="mb-2 text-sm font-medium text-slate-900">Excel文件格式要求：</h4>
+        <h4 className="mb-2 text-sm font-medium text-slate-900">Excel文件格式说明：</h4>
         <ul className="list-inside list-disc space-y-1 text-sm text-slate-600">
-          <li>第一行：模板名称和描述（可选）</li>
-          <li>第二行：颜色配置（背景色、表头色、文字色等）</li>
-          <li>第三行：列标题（课程名称、星期、开始节次、结束节次等）</li>
-          <li>后续行：课程数据</li>
+          <li>支持多种格式，系统会自动识别Excel结构</li>
+          <li><strong>标准格式</strong>：第一行模板信息，第二行颜色配置，第三行列标题，后续课程数据</li>
+          <li><strong>简化格式</strong>：第一行列标题，后续课程数据（使用默认样式）</li>
+          <li><strong>自定义格式</strong>：系统自动识别列标题，支持任意列顺序</li>
+          <li>支持的列名：课程名称/课程名、星期、开始节次/开始、结束节次/结束、教室/地点、教师/老师、颜色</li>
+          <li>如果缺少模板信息，将使用文件名作为模板名称</li>
         </ul>
       </div>
 

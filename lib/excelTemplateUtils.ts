@@ -4,6 +4,10 @@ import type { ScheduleTemplate, CourseRawRow } from "./types";
 
 /**
  * 解析Excel文件并转换为模板数据
+ * 支持多种Excel格式：
+ * 1. 标准格式：第一行模板信息，第二行颜色配置，第三行列标题，后续课程数据
+ * 2. 简化格式：第一行列标题，后续课程数据（使用默认模板信息）
+ * 3. 自定义格式：自动识别列标题行，提取课程数据
  */
 export function parseExcelTemplate(file: File): Promise<ScheduleTemplate> {
   return new Promise((resolve, reject) => {
@@ -21,23 +25,17 @@ export function parseExcelTemplate(file: File): Promise<ScheduleTemplate> {
         // 转换为JSON
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
-        // 解析模板信息（假设第一行包含模板名称和描述）
-        const templateInfo = parseTemplateInfo(jsonData[0]);
-
-        // 解析颜色配置（假设第二行包含颜色配置）
-        const colors = parseColors(jsonData[1] || []);
-
-        // 解析课程数据（从第三行开始）
-        const courses = parseCourses(jsonData.slice(2));
+        // 智能识别Excel格式并解析
+        const parsedData = parseExcelData(jsonData, file.name);
 
         // 创建模板对象
         const template: ScheduleTemplate = {
-          id: generateTemplateId(templateInfo.name),
-          name: templateInfo.name,
-          style: determineStyle(colors),
-          description: templateInfo.description || "从Excel导入的模板",
-          previewColor: colors.background || "#e2e8f0",
-          colors,
+          id: generateTemplateId(parsedData.templateInfo.name),
+          name: parsedData.templateInfo.name,
+          style: determineStyle(parsedData.colors),
+          description: parsedData.templateInfo.description || `从 ${file.name} 导入的模板`,
+          previewColor: parsedData.colors.background || "#e2e8f0",
+          colors: parsedData.colors,
           borderRadius: {
             cell: "8px",
             course: "12px"
@@ -60,11 +58,128 @@ export function parseExcelTemplate(file: File): Promise<ScheduleTemplate> {
 }
 
 /**
+ * 智能解析Excel数据
+ */
+function parseExcelData(jsonData: any[][], fileName: string): {
+  templateInfo: { name: string; description?: string };
+  colors: ScheduleTemplate["colors"];
+  courses: CourseRawRow[];
+} {
+  if (!jsonData || jsonData.length === 0) {
+    throw new Error("Excel文件为空");
+  }
+
+  // 尝试识别第一行是否为模板信息行
+  const firstRow = jsonData[0];
+  const isTemplateInfoRow = isRowTemplateInfo(firstRow);
+
+  let templateInfo: { name: string; description?: string };
+  let colors: ScheduleTemplate["colors"];
+  let courseDataRows: any[][];
+
+  if (isTemplateInfoRow) {
+    // 标准格式：第一行是模板信息
+    templateInfo = parseTemplateInfo(firstRow);
+
+    // 检查第二行是否为颜色配置
+    if (jsonData.length > 1 && isRowColorConfig(jsonData[1])) {
+      colors = parseColors(jsonData[1]);
+      // 课程数据从第三行开始
+      courseDataRows = jsonData.slice(2);
+    } else {
+      // 没有颜色配置，使用默认颜色
+      colors = getDefaultColors();
+      // 课程数据从第二行开始
+      courseDataRows = jsonData.slice(1);
+    }
+  } else {
+    // 简化格式：第一行不是模板信息，使用文件名作为模板名
+    templateInfo = {
+      name: fileName.replace(/\.(xlsx|xls)$/i, ""),
+      description: undefined
+    };
+    colors = getDefaultColors();
+
+    // 查找列标题行
+    const headerRowIndex = findHeaderRow(jsonData);
+    if (headerRowIndex !== -1) {
+      courseDataRows = jsonData.slice(headerRowIndex + 1);
+    } else {
+      // 没有找到列标题，假设第一行就是数据
+      courseDataRows = jsonData.slice(1);
+    }
+  }
+
+  // 解析课程数据
+  const courses = parseCourses(courseDataRows);
+
+  return { templateInfo, colors, courses };
+}
+
+/**
+ * 判断行是否为模板信息行
+ */
+function isRowTemplateInfo(row: any[]): boolean {
+  if (!row || row.length === 0) return false;
+  const firstCell = String(row[0] || "").trim();
+  // 模板名称通常不是颜色代码
+  return !firstCell.startsWith("#") && firstCell.length > 0;
+}
+
+/**
+ * 判断行是否为颜色配置行
+ */
+function isRowColorConfig(row: any[]): boolean {
+  if (!row || row.length === 0) return false;
+  const firstCell = String(row[0] || "").trim();
+  // 颜色配置行以#开头
+  return firstCell.startsWith("#");
+}
+
+/**
+ * 查找列标题行
+ */
+function findHeaderRow(rows: any[][]): number {
+  const headerKeywords = ["课程名称", "课程名", "星期", "开始节次", "结束节次", "教室", "教师", "颜色"];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+    const rowStr = row.join(" ").toLowerCase();
+    // 检查是否包含至少3个关键词
+    const matchCount = headerKeywords.filter(keyword => 
+      rowStr.includes(keyword.toLowerCase())
+    ).length;
+    if (matchCount >= 3) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * 获取默认颜色配置
+ */
+function getDefaultColors(): ScheduleTemplate["colors"] {
+  return {
+    background: "#ffffff",
+    headerBg: "#f8fafc",
+    headerText: "#1e293b",
+    gridLines: "#e2e8f0",
+    cellBg: "#ffffff",
+    cellText: "#64748b",
+    courseDefault: "#dbeafe",
+    courseText: "#1e3a8a",
+    conflictBg: "#fee2e2",
+    conflictText: "#991b1b"
+  };
+}
+
+/**
  * 解析模板信息
  */
 function parseTemplateInfo(row: any[]): { name: string; description?: string } {
-  const name = row[0] || "未命名模板";
-  const description = row[1];
+  const name = String(row[0] || "未命名模板").trim();
+  const description = row[1] ? String(row[1]).trim() : undefined;
   return { name, description };
 }
 
@@ -88,17 +203,91 @@ function parseColors(row: any[]): ScheduleTemplate["colors"] {
 
 /**
  * 解析课程数据
+ * 支持智能识别列，不依赖固定列顺序
  */
 function parseCourses(rows: any[][]): CourseRawRow[] {
-  return rows.map((row, index) => ({
-    课程名称: row[0],
-    星期: row[1],
-    开始节次: row[2],
-    结束节次: row[3],
-    教室: row[4],
-    教师: row[5],
-    颜色: row[6]
-  })).filter(course => course.课程名称);
+  if (!rows || rows.length === 0) return [];
+
+  // 尝试识别列标题
+  const headerRow = rows[0];
+  const columnMap = identifyColumns(headerRow);
+
+  // 如果第一行看起来像数据行（没有列标题），则使用默认列顺序
+  const startIndex = Object.keys(columnMap).length > 0 ? 1 : 0;
+  const dataRows = startIndex === 1 ? rows.slice(1) : rows;
+
+  return dataRows.map((row, index) => {
+    const course: CourseRawRow = {};
+
+    // 根据列映射提取数据
+    if (columnMap.课程名称 !== undefined) {
+      course.课程名称 = row[columnMap.课程名称];
+    }
+    if (columnMap.星期 !== undefined) {
+      course.星期 = row[columnMap.星期];
+    }
+    if (columnMap.开始节次 !== undefined) {
+      course.开始节次 = row[columnMap.开始节次];
+    }
+    if (columnMap.结束节次 !== undefined) {
+      course.结束节次 = row[columnMap.结束节次];
+    }
+    if (columnMap.教室 !== undefined) {
+      course.教室 = row[columnMap.教室];
+    }
+    if (columnMap.教师 !== undefined) {
+      course.教师 = row[columnMap.教师];
+    }
+    if (columnMap.颜色 !== undefined) {
+      course.颜色 = row[columnMap.颜色];
+    }
+
+    // 如果没有找到列映射，使用默认列顺序
+    if (Object.keys(columnMap).length === 0) {
+      course.课程名称 = row[0];
+      course.星期 = row[1];
+      course.开始节次 = row[2];
+      course.结束节次 = row[3];
+      course.教室 = row[4];
+      course.教师 = row[5];
+      course.颜色 = row[6];
+    }
+
+    return course;
+  }).filter(course => course.课程名称);
+}
+
+/**
+ * 识别列标题并返回列索引映射
+ */
+function identifyColumns(headerRow: any[]): Record<string, number> {
+  if (!headerRow || headerRow.length === 0) return {};
+
+  const columnMap: Record<string, number> = {};
+  const columnAliases: Record<string, string[]> = {
+    课程名称: ["课程名称", "课程名", "课程", "name", "course"],
+    星期: ["星期", "周", "day", "weekday"],
+    开始节次: ["开始节次", "开始", "start", "开始时间"],
+    结束节次: ["结束节次", "结束", "end", "结束时间"],
+    教室: ["教室", "地点", "classroom", "location", "room"],
+    教师: ["教师", "老师", "teacher", "instructor"],
+    颜色: ["颜色", "colour", "color"]
+  };
+
+  headerRow.forEach((cell, index) => {
+    if (!cell) return;
+    const cellValue = String(cell).trim().toLowerCase();
+
+    // 查找匹配的列
+    for (const [columnName, aliases] of Object.entries(columnAliases)) {
+      if (aliases.some(alias => cellValue.includes(alias))) {
+        columnMap[columnName] = index;
+        break;
+      }
+    }
+  });
+
+  return columnMap;
 }
 
 /**
